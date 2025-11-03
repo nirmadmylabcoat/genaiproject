@@ -1,0 +1,21 @@
+:root {
+  --genaccess-font-scale: 1;
+  --genaccess-line-spacing: 1.4;
+}
+
+body {
+  font-size: calc(var(--genaccess-font-scale, 1) * 1rem);
+  line-height: var(--genaccess-line-spacing, 1.4);
+}
+
+.genaccess-summary {
+  background: rgba(91, 33, 182, 0.85);
+  color: #fff;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+}
+

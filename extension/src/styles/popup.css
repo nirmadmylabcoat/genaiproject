@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.profile-card {
+  @apply rounded-xl border border-white/10 bg-white/5 p-3 shadow-lg;
+}
+
