@@ -37,6 +37,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.warn("Failed to capture tab", error);
         sendResponse({ error: String(error) });
       }
+      return;
+    }
+    if (message.type === "TTS_STOP") {
+      try {
+        chrome.tts.stop();
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({ error: String(error) });
+      }
+      return;
+    }
+    if (message.type === "TTS_SPEAK") {
+      try {
+        const { text, lang, rate } = message.payload;
+        chrome.tts.stop();
+        chrome.tts.speak(text, { lang: lang ?? "en-US", rate: rate ?? 1 });
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({ error: String(error) });
+      }
+      return;
     }
   })().catch((error) => {
     console.error("Background error", error);

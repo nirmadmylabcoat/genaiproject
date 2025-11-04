@@ -9989,130 +9989,6 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
   function applyGenerativeLayout(layout) {
     applyTransformationDirectives(layout.directives);
   }
-  const SpeechRecognitionImpl = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-  class VoiceNavigator {
-    constructor(options) {
-      this.observer = null;
-      this.recognition = null;
-      this.hoveringElement = null;
-      this.handleMouseOver = (event) => {
-        const target = event.target;
-        if (target == null) return;
-        this.hoveringElement = target;
-        this.speakElement(target);
-      };
-      this.handleFocus = (event) => {
-        const target = event.target;
-        if (target == null) return;
-        this.hoveringElement = target;
-        this.speakElement(target);
-      };
-      this.options = {
-        enabled: options.enabled,
-        language: options.language ?? "en-US",
-        rate: options.rate ?? 1
-      };
-    }
-    init() {
-      if (!this.options.enabled) return;
-      this.attachHoverListeners();
-      this.bootstrapRecognition();
-    }
-    destroy() {
-      document.removeEventListener("mouseover", this.handleMouseOver);
-      document.removeEventListener("focusin", this.handleFocus);
-      if (this.observer != null) {
-        this.observer.disconnect();
-        this.observer = null;
-      }
-      if (this.recognition != null) {
-        this.recognition.stop();
-      }
-    }
-    attachHoverListeners() {
-      document.addEventListener("mouseover", this.handleMouseOver);
-      document.addEventListener("focusin", this.handleFocus);
-      this.observer = new MutationObserver(() => {
-        document.querySelectorAll("a, button, input, [role]").forEach((el2) => {
-          if (!el2.hasAttribute("data-genaccess-hover-bound")) {
-            el2.setAttribute("data-genaccess-hover-bound", "true");
-          }
-        });
-      });
-      this.observer.observe(document.body, { childList: true, subtree: true });
-    }
-    bootstrapRecognition() {
-      if (SpeechRecognitionImpl == null) {
-        console.info("Speech recognition API not available");
-        return;
-      }
-      const rec = new SpeechRecognitionImpl();
-      rec.lang = this.options.language ?? "en-US";
-      rec.continuous = true;
-      rec.interimResults = false;
-      rec.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
-        this.handleCommand(transcript.toLowerCase());
-      };
-      rec.onerror = (event) => {
-        console.warn("Voice recognition error", event.error);
-      };
-      this.recognition = rec;
-      try {
-        rec.start();
-      } catch (error) {
-        console.warn("Unable to start voice recognition", error);
-      }
-    }
-    speakElement(element) {
-      const label = element.getAttribute("aria-label") ?? element.innerText ?? element.getAttribute("title") ?? element.tagName;
-      const utterance = new SpeechSynthesisUtterance(label);
-      utterance.lang = this.options.language ?? "en-US";
-      utterance.rate = this.options.rate ?? 1;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    }
-    handleCommand(command) {
-      if (command.includes("scroll down")) {
-        window.scrollBy({ top: window.innerHeight * 0.8, behavior: "smooth" });
-        return;
-      }
-      if (command.includes("scroll up")) {
-        window.scrollBy({ top: -window.innerHeight * 0.8, behavior: "smooth" });
-        return;
-      }
-      if (command.includes("focus next")) {
-        this.focusNextElement();
-        return;
-      }
-      if (command.includes("open link")) {
-        this.activateCurrentElement();
-      }
-    }
-    focusNextElement() {
-      const focusables = Array.from(document.querySelectorAll("a, button, input, select, textarea, [tabindex]")).filter((el2) => !el2.hasAttribute("disabled"));
-      const currentIndex = this.hoveringElement != null ? focusables.indexOf(this.hoveringElement) : document.activeElement != null ? focusables.indexOf(document.activeElement) : -1;
-      const next = focusables[(currentIndex + 1) % focusables.length];
-      if (next != null) {
-        next.focus();
-        this.speakElement(next);
-        this.hoveringElement = next;
-      }
-    }
-    activateCurrentElement() {
-      const element = this.hoveringElement ?? document.activeElement;
-      if (element instanceof HTMLAnchorElement) {
-        element.click();
-      } else if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
-        element.click();
-      }
-    }
-  }
-  function initVoiceNavigator(options) {
-    const navigator2 = new VoiceNavigator(options);
-    navigator2.init();
-    return navigator2;
-  }
   const DEFAULT_PROFILE = {
     id: "high-contrast",
     label: "High Contrast",
@@ -10140,8 +10016,11 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
   };
   const SUMMARY_CLASS = "genaccess-summary";
   let runtimeState = null;
-  let voiceNavigator = null;
   let enhancementInFlight = false;
+  let selectionTtsBound = false;
+  let selectionSpeakTimer = null;
+  let lastSelectionText = null;
+  let lastSelectionAt = 0;
   void bootstrap();
   async function bootstrap() {
     console.log("GenAccess: Content script loaded");
@@ -10209,7 +10088,7 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
         applyRuleBasedAdjustments(runtimeState.activeProfile);
         console.log("GenAccess: Rule-based adjustments applied");
       }
-      attachVoiceNavigator();
+      attachSelectionTts();
     } catch (error) {
       console.error("GenAccess enhancement failed", error);
     } finally {
@@ -10337,27 +10216,57 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
     });
     return nodes;
   }
-  function attachVoiceNavigator() {
-    detachVoiceNavigator();
-    if (runtimeState == null || !runtimeState.enabled) return;
-    voiceNavigator = initVoiceNavigator({
-      enabled: true,
-      rate: Math.max(0.85, Math.min(1.2, runtimeState.activeProfile.preferences.fontScale))
-    });
-  }
   function clearSummaries() {
     document.querySelectorAll(`.${SUMMARY_CLASS}`).forEach((el2) => {
       el2.remove();
     });
   }
-  function detachVoiceNavigator() {
-    if (voiceNavigator != null) {
-      voiceNavigator.destroy();
-      voiceNavigator = null;
+  function attachSelectionTts() {
+    if (selectionTtsBound) return;
+    const handler = () => {
+      if (selectionSpeakTimer != null) window.clearTimeout(selectionSpeakTimer);
+      selectionSpeakTimer = window.setTimeout(() => {
+        var _a2;
+        const raw = ((_a2 = window.getSelection()) == null ? void 0 : _a2.toString()) ?? "";
+        const text = raw.replace(/\s+/g, " ").trim();
+        if (text.length < 2) return;
+        const now = Date.now();
+        if (text === lastSelectionText && now - lastSelectionAt < 800) return;
+        lastSelectionText = text;
+        lastSelectionAt = now;
+        const rate = Math.max(0.85, Math.min(1.2, (runtimeState == null ? void 0 : runtimeState.activeProfile.preferences.fontScale) ?? 1));
+        chrome.runtime.sendMessage({ type: "TTS_SPEAK", payload: { text, lang: "en-US", rate } }).catch(() => {
+          try {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "en-US";
+            utterance.rate = rate;
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+          } catch {
+          }
+        });
+      }, 150);
+    };
+    document.addEventListener("selectionchange", handler);
+    document.addEventListener("mouseup", handler);
+    document.addEventListener("keyup", handler);
+    attachSelectionTts._handler = handler;
+    selectionTtsBound = true;
+  }
+  function detachSelectionTts() {
+    if (!selectionTtsBound) return;
+    const handler = attachSelectionTts._handler;
+    if (handler != null) {
+      document.removeEventListener("selectionchange", handler);
+      document.removeEventListener("mouseup", handler);
+      document.removeEventListener("keyup", handler);
     }
+    selectionTtsBound = false;
+    chrome.runtime.sendMessage({ type: "TTS_STOP" }).catch(() => {
+    });
   }
   function teardownEnhancements() {
-    detachVoiceNavigator();
+    detachSelectionTts();
     resetTransformations();
     clearRuleBasedAdjustments();
     clearSummaries();

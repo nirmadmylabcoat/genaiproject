@@ -24,6 +24,10 @@ export class VoiceNavigator {
   private recognition: MinimalSpeechRecognition | null = null
   private hoveringElement: HTMLElement | null = null
   private options: VoiceOptions
+  private lastSpokenText: string | null = null
+  private lastSpokenAt = 0
+  private speakTimer: number | null = null
+  private useChromeTts = typeof chrome !== 'undefined' && (chrome as any).tts != null
 
   constructor (options: VoiceOptions) {
     this.options = {
@@ -99,24 +103,83 @@ export class VoiceNavigator {
   private handleMouseOver = (event: MouseEvent): void => {
     const target = event.target as HTMLElement
     if (target == null) return
-    this.hoveringElement = target
-    this.speakElement(target)
+    const speakable = this.getSpeakableElement(target)
+    if (speakable == null || speakable === this.hoveringElement) return
+    this.hoveringElement = speakable
+    this.queueSpeak(speakable)
   }
 
   private handleFocus = (event: FocusEvent): void => {
     const target = event.target as HTMLElement
     if (target == null) return
-    this.hoveringElement = target
-    this.speakElement(target)
+    const speakable = this.getSpeakableElement(target)
+    if (speakable == null) return
+    this.hoveringElement = speakable
+    this.queueSpeak(speakable)
+  }
+
+  private queueSpeak (element: HTMLElement): void {
+    if (this.speakTimer != null) window.clearTimeout(this.speakTimer)
+    this.speakTimer = window.setTimeout(() => this.speakElement(element), 120)
   }
 
   private speakElement (element: HTMLElement): void {
-    const label = element.getAttribute('aria-label') ?? element.innerText ?? element.getAttribute('title') ?? element.tagName
-    const utterance = new SpeechSynthesisUtterance(label)
-    utterance.lang = this.options.language ?? 'en-US'
-    utterance.rate = this.options.rate ?? 1
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(utterance)
+    const label = this.getElementLabel(element)
+    if (label == null) return
+
+    const now = Date.now()
+    if (this.lastSpokenText === label && now - this.lastSpokenAt < 800) return
+    this.lastSpokenText = label
+    this.lastSpokenAt = now
+
+    const rate = this.options.rate ?? 1
+    if (this.useChromeTts) {
+      // Route through background for reliable TTS in MV3
+      chrome.runtime.sendMessage({
+        type: 'TTS_SPEAK',
+        payload: { text: label, lang: this.options.language ?? 'en-US', rate }
+      }).catch(() => {
+        this.localSpeak(label, rate)
+      })
+      return
+    }
+    this.localSpeak(label, rate)
+  }
+
+  private localSpeak (label: string, rate: number): void {
+    try {
+      const utterance = new SpeechSynthesisUtterance(label)
+      utterance.lang = this.options.language ?? 'en-US'
+      utterance.rate = rate
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(utterance)
+    } catch {
+      // ignore
+    }
+  }
+
+  private getElementLabel (element: HTMLElement): string | null {
+    const candidates = [
+      element.getAttribute('aria-label'),
+      element.getAttribute('title'),
+      element.innerText?.trim()
+    ].filter(Boolean) as string[]
+    if (candidates.length === 0) return null
+    const text = candidates[0].replace(/\s+/g, ' ').trim()
+    if (text.length < 2) return null
+    if (text.length > 280) return text.slice(0, 280)
+    return text
+  }
+
+  private getSpeakableElement (start: HTMLElement): HTMLElement | null {
+    let el: HTMLElement | null = start
+    const isInteractive = (e: HTMLElement) => e.matches('a, button, input, select, textarea, [role], [tabindex]')
+    while (el != null && el !== document.body && el !== document.documentElement) {
+      const label = this.getElementLabel(el)
+      if (label != null && (isInteractive(el) || label.length >= 4)) return el
+      el = el.parentElement
+    }
+    return null
   }
 
   private handleCommand (command: string): void {

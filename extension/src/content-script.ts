@@ -17,6 +17,10 @@ interface DetectApiResponse {
 let runtimeState: RuntimeState | null = null
 let voiceNavigator: VoiceNavigator | null = null
 let enhancementInFlight = false
+let selectionTtsBound = false
+let selectionSpeakTimer: number | null = null
+let lastSelectionText: string | null = null
+let lastSelectionAt = 0
 
 void bootstrap()
 
@@ -100,7 +104,8 @@ async function runEnhancements (): Promise<void> {
       console.log('GenAccess: Rule-based adjustments applied')
     }
 
-    attachVoiceNavigator()
+    // Use selection-based narration instead of hover
+    attachSelectionTts()
   } catch (error) {
     console.error('GenAccess enhancement failed', error)
   } finally {
@@ -300,8 +305,52 @@ function detachVoiceNavigator (): void {
   }
 }
 
+function attachSelectionTts (): void {
+  if (selectionTtsBound) return
+  const handler = (): void => {
+    if (selectionSpeakTimer != null) window.clearTimeout(selectionSpeakTimer)
+    selectionSpeakTimer = window.setTimeout(() => {
+      const raw = window.getSelection()?.toString() ?? ''
+      const text = raw.replace(/\s+/g, ' ').trim()
+      if (text.length < 2) return
+      const now = Date.now()
+      if (text === lastSelectionText && now - lastSelectionAt < 800) return
+      lastSelectionText = text
+      lastSelectionAt = now
+      const rate = Math.max(0.85, Math.min(1.2, runtimeState?.activeProfile.preferences.fontScale ?? 1))
+      chrome.runtime.sendMessage({ type: 'TTS_SPEAK', payload: { text, lang: 'en-US', rate } }).catch(() => {
+        try {
+          const utterance = new SpeechSynthesisUtterance(text)
+          utterance.lang = 'en-US'
+          utterance.rate = rate
+          window.speechSynthesis.cancel()
+          window.speechSynthesis.speak(utterance)
+        } catch {}
+      })
+    }, 150)
+  }
+  document.addEventListener('selectionchange', handler)
+  document.addEventListener('mouseup', handler)
+  document.addEventListener('keyup', handler)
+  ;(attachSelectionTts as any)._handler = handler
+  selectionTtsBound = true
+}
+
+function detachSelectionTts (): void {
+  if (!selectionTtsBound) return
+  const handler = (attachSelectionTts as any)._handler as EventListener | undefined
+  if (handler != null) {
+    document.removeEventListener('selectionchange', handler)
+    document.removeEventListener('mouseup', handler)
+    document.removeEventListener('keyup', handler)
+  }
+  selectionTtsBound = false
+  chrome.runtime.sendMessage({ type: 'TTS_STOP' }).catch(() => {})
+}
+
 function teardownEnhancements (): void {
   detachVoiceNavigator()
+  detachSelectionTts()
   resetTransformations()
   clearRuleBasedAdjustments()
   clearSummaries()

@@ -6,6 +6,8 @@ type BackgroundMessage =
   | { type: 'GET_RUNTIME_STATE' }
   | { type: 'SET_RUNTIME_STATE'; payload: RuntimeState }
   | { type: 'CAPTURE_VIEWPORT' }
+  | { type: 'TTS_SPEAK'; payload: { text: string, lang?: string, rate?: number } }
+  | { type: 'TTS_STOP' }
 
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.storage.local.get('genaccess_runtime', (result) => {
@@ -40,6 +42,29 @@ chrome.runtime.onMessage.addListener((message: BackgroundMessage, sender, sendRe
         console.warn('Failed to capture tab', error)
         sendResponse({ error: String(error) })
       }
+      return
+    }
+
+    if (message.type === 'TTS_STOP') {
+      try {
+        chrome.tts.stop()
+        sendResponse({ success: true })
+      } catch (error) {
+        sendResponse({ error: String(error) })
+      }
+      return
+    }
+
+    if (message.type === 'TTS_SPEAK') {
+      try {
+        const { text, lang, rate } = message.payload
+        chrome.tts.stop()
+        chrome.tts.speak(text, { lang: lang ?? 'en-US', rate: rate ?? 1 })
+        sendResponse({ success: true })
+      } catch (error) {
+        sendResponse({ error: String(error) })
+      }
+      return
     }
   })().catch((error) => {
     console.error('Background error', error)
