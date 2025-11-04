@@ -61,7 +61,7 @@ export const DEFAULT_RUNTIME_STATE: RuntimeState = {
     baseUrl: 'http://localhost:8000/api'
   },
   activeProfile: DEFAULT_PROFILE,
-  enabled: true,
-  mode: 'generative'
+  enabled: false,
+  mode: 'rules'
 }
 

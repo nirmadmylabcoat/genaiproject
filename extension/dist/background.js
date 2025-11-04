@@ -1,4 +1,4 @@
-import { a as DEFAULT_RUNTIME_STATE } from "./chunks/config-Pt77BZmv.js";
+import { a as DEFAULT_RUNTIME_STATE } from "./chunks/config-A9U9s7UZ.js";
 function broadcastMessage(message) {
   void chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "CAPTURE_VIEWPORT") {
       try {
-        const dataUrl = await chrome.tabs.captureVisibleTab((_a = sender.tab) == null ? void 0 : _a.windowId, { format: "png" });
+        const dataUrl = ((_a = sender.tab) == null ? void 0 : _a.windowId) != null ? await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" }) : await chrome.tabs.captureVisibleTab({ format: "png" });
         sendResponse({ dataUrl });
       } catch (error) {
         console.warn("Failed to capture tab", error);

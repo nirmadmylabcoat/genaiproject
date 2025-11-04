@@ -9891,10 +9891,15 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
       color: #ffffff !important;
     }
     
-    * {
-      background-color: inherit !important;
+    /* Force high-contrast across all elements and pseudo-elements */
+    *, *::before, *::after {
       color: inherit !important;
       border-color: #ffffff !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      outline-color: #ffffff !important;
     }
     
     a, a:link, a:visited {
@@ -9909,6 +9914,25 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
       background-color: #333333 !important;
       color: #ffffff !important;
       border: 2px solid #ffffff !important;
+    }
+    
+    /* SVGs and icons */
+    svg, svg * {
+      fill: currentColor !important;
+      stroke: currentColor !important;
+    }
+    
+    /* Neutralize special backgrounds */
+    [style*="background:"], [style*="background-image:"], [class*="bg-"] {
+      background: transparent !important;
+      background-image: none !important;
+    }
+    
+    /* Tables and code blocks */
+    table, thead, tbody, tfoot, tr, th, td, pre, code {
+      background-color: transparent !important;
+      color: inherit !important;
+      border-color: #ffffff !important;
     }
     
     img, video {
@@ -10022,19 +10046,20 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
         console.info("Speech recognition API not available");
         return;
       }
-      this.recognition = new SpeechRecognitionImpl();
-      this.recognition.lang = this.options.language ?? "en-US";
-      this.recognition.continuous = true;
-      this.recognition.interimResults = false;
-      this.recognition.onresult = (event) => {
+      const rec = new SpeechRecognitionImpl();
+      rec.lang = this.options.language ?? "en-US";
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript.trim();
         this.handleCommand(transcript.toLowerCase());
       };
-      this.recognition.onerror = (event) => {
+      rec.onerror = (event) => {
         console.warn("Voice recognition error", event.error);
       };
+      this.recognition = rec;
       try {
-        this.recognition.start();
+        rec.start();
       } catch (error) {
         console.warn("Unable to start voice recognition", error);
       }
@@ -10088,67 +10113,6 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
     navigator2.init();
     return navigator2;
   }
-  const SENTENCE_DELIMITERS = new RegExp("(?<=[.!?])\\s+", "g");
-  async function summarizeText(request, backendUrl) {
-    const sentences = request.text.split(SENTENCE_DELIMITERS).filter(Boolean);
-    if (sentences.length <= (request.maxSentences ?? 3)) {
-      return {
-        nodeId: request.nodeId,
-        summary: request.text,
-        method: "local"
-      };
-    }
-    if (sentences.length > 20 && backendUrl != null) {
-      try {
-        const response = await fetch(`${backendUrl}/summarize`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            text: request.text,
-            max_sentences: request.maxSentences ?? 3
-          })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          return {
-            nodeId: request.nodeId,
-            summary: data.summary,
-            method: "api"
-          };
-        }
-      } catch (error) {
-        console.warn("Remote summarization failed, falling back to local", error);
-      }
-    }
-    const summary = performLocalSummarization(sentences, request.maxSentences ?? 3);
-    return {
-      nodeId: request.nodeId,
-      summary,
-      method: "local"
-    };
-  }
-  function performLocalSummarization(sentences, maxSentences) {
-    const sentenceScores = /* @__PURE__ */ new Map();
-    const tf2 = /* @__PURE__ */ new Map();
-    const allWords = [];
-    sentences.forEach((sentence) => {
-      const words = sentence.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
-      allWords.push(words);
-      words.forEach((word) => {
-        tf2.set(word, (tf2.get(word) ?? 0) + 1);
-      });
-    });
-    sentences.forEach((sentence, index) => {
-      const words = allWords[index];
-      const score = words.reduce((acc, word) => acc + (tf2.get(word) ?? 0), 0) / (words.length || 1);
-      sentenceScores.set(sentence, score);
-    });
-    const ranked = Array.from(sentenceScores.entries()).sort((a, b) => b[1] - a[1]).slice(0, maxSentences);
-    const order = new Map(ranked.map(([sentence], index) => [sentence, index]));
-    return ranked.map(([sentence]) => sentence).sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0)).join(" ");
-  }
   const DEFAULT_PROFILE = {
     id: "high-contrast",
     label: "High Contrast",
@@ -10171,8 +10135,8 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
       baseUrl: "http://localhost:8000/api"
     },
     activeProfile: DEFAULT_PROFILE,
-    enabled: true,
-    mode: "generative"
+    enabled: false,
+    mode: "rules"
   };
   const SUMMARY_CLASS = "genaccess-summary";
   let runtimeState = null;
@@ -10215,15 +10179,6 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
         void runEnhancements();
       }
     });
-    document.addEventListener("keydown", async (event) => {
-      var _a2;
-      if (event.altKey && event.key.toLowerCase() === "s") {
-        const selection = (_a2 = window.getSelection()) == null ? void 0 : _a2.focusNode;
-        if ((selection == null ? void 0 : selection.parentElement) != null) {
-          await summarizeElement(selection.parentElement);
-        }
-      }
-    });
   }
   async function getRuntimeState() {
     try {
@@ -10255,7 +10210,6 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
         console.log("GenAccess: Rule-based adjustments applied");
       }
       attachVoiceNavigator();
-      await annotateLongParagraphs(domTree);
     } catch (error) {
       console.error("GenAccess enhancement failed", error);
     } finally {
@@ -10390,30 +10344,6 @@ ${u}`, c = r.createShaderModule({ code: d, label: t.name });
       enabled: true,
       rate: Math.max(0.85, Math.min(1.2, runtimeState.activeProfile.preferences.fontScale))
     });
-  }
-  async function annotateLongParagraphs(domTree) {
-    const candidates = flattenDom(domTree).filter((node) => {
-      var _a2;
-      return (((_a2 = node.text) == null ? void 0 : _a2.length) ?? 0) > 600;
-    });
-    for (const node of candidates) {
-      if (node.text == null) continue;
-      const summary = await summarizeText({ nodeId: node.nodeId, text: node.text, maxSentences: 3 }, runtimeState == null ? void 0 : runtimeState.backend.baseUrl);
-      const element = document.querySelector(`[data-genaccess-id="${node.nodeId}"]`);
-      if (element != null) {
-        if (element.querySelector(`.${SUMMARY_CLASS}`) != null) continue;
-        const summaryEl = document.createElement("div");
-        summaryEl.className = SUMMARY_CLASS;
-        summaryEl.textContent = summary.summary;
-        element.prepend(summaryEl);
-      }
-    }
-  }
-  async function summarizeElement(element) {
-    const nodeId = element.getAttribute("data-genaccess-id") ?? "ad-hoc";
-    const text = element.innerText;
-    const summary = await summarizeText({ nodeId, text, maxSentences: 2 }, runtimeState == null ? void 0 : runtimeState.backend.baseUrl);
-    window.alert(summary.summary);
   }
   function clearSummaries() {
     document.querySelectorAll(`.${SUMMARY_CLASS}`).forEach((el2) => {

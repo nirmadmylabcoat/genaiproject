@@ -1,4 +1,4 @@
-import { D as DEFAULT_PROFILES } from "./chunks/config-Pt77BZmv.js";
+import { D as DEFAULT_PROFILES } from "./chunks/config-A9U9s7UZ.js";
 (function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {

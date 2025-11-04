@@ -32,7 +32,9 @@ chrome.runtime.onMessage.addListener((message: BackgroundMessage, sender, sendRe
 
     if (message.type === 'CAPTURE_VIEWPORT') {
       try {
-        const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab?.windowId, { format: 'png' })
+        const dataUrl = sender.tab?.windowId != null
+          ? await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'png' })
+          : await chrome.tabs.captureVisibleTab({ format: 'png' })
         sendResponse({ dataUrl })
       } catch (error) {
         console.warn('Failed to capture tab', error)

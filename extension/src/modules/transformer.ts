@@ -155,10 +155,15 @@ function injectHighContrastStyles (): void {
       color: #ffffff !important;
     }
     
-    * {
-      background-color: inherit !important;
+    /* Force high-contrast across all elements and pseudo-elements */
+    *, *::before, *::after {
       color: inherit !important;
       border-color: #ffffff !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      outline-color: #ffffff !important;
     }
     
     a, a:link, a:visited {
@@ -173,6 +178,25 @@ function injectHighContrastStyles (): void {
       background-color: #333333 !important;
       color: #ffffff !important;
       border: 2px solid #ffffff !important;
+    }
+    
+    /* SVGs and icons */
+    svg, svg * {
+      fill: currentColor !important;
+      stroke: currentColor !important;
+    }
+    
+    /* Neutralize special backgrounds */
+    [style*="background:"], [style*="background-image:"], [class*="bg-"] {
+      background: transparent !important;
+      background-image: none !important;
+    }
+    
+    /* Tables and code blocks */
+    table, thead, tbody, tfoot, tr, th, td, pre, code {
+      background-color: transparent !important;
+      color: inherit !important;
+      border-color: #ffffff !important;
     }
     
     img, video {

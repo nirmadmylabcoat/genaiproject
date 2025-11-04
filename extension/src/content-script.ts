@@ -62,14 +62,7 @@ async function bootstrap (): Promise<void> {
     }
   })
 
-  document.addEventListener('keydown', async (event) => {
-    if (event.altKey && event.key.toLowerCase() === 's') {
-      const selection = window.getSelection()?.focusNode
-      if (selection?.parentElement != null) {
-        await summarizeElement(selection.parentElement)
-      }
-    }
-  })
+  // Removed selection-based popup/summary. Narration happens on hover via VoiceNavigator.
 }
 
 async function getRuntimeState (): Promise<RuntimeState> {
@@ -108,7 +101,6 @@ async function runEnhancements (): Promise<void> {
     }
 
     attachVoiceNavigator()
-    await annotateLongParagraphs(domTree)
   } catch (error) {
     console.error('GenAccess enhancement failed', error)
   } finally {
@@ -293,12 +285,7 @@ async function annotateLongParagraphs (domTree: DomNode): Promise<void> {
   }
 }
 
-async function summarizeElement (element: HTMLElement): Promise<void> {
-  const nodeId = element.getAttribute('data-genaccess-id') ?? 'ad-hoc'
-  const text = element.innerText
-  const summary = await summarizeText({ nodeId, text, maxSentences: 2 }, runtimeState?.backend.baseUrl)
-  window.alert(summary.summary)
-}
+// summarizeElement removed to avoid selection popups
 
 function clearSummaries (): void {
   document.querySelectorAll<HTMLElement>(`.${SUMMARY_CLASS}`).forEach((el) => {

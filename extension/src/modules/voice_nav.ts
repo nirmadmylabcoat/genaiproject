@@ -1,6 +1,17 @@
-type SpeechRecognitionConstructor = new () => SpeechRecognition
+// Minimal SpeechRecognition typing to satisfy TS in browsers without built-in types
+interface MinimalSpeechRecognition {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: (event: any) => void
+  onerror: (event: any) => void
+  start: () => void
+  stop: () => void
+}
 
-const SpeechRecognitionImpl = (window.SpeechRecognition ?? window.webkitSpeechRecognition) as SpeechRecognitionConstructor | undefined
+type SpeechRecognitionConstructor = new () => MinimalSpeechRecognition
+
+const SpeechRecognitionImpl = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition as SpeechRecognitionConstructor | undefined
 
 export interface VoiceOptions {
   enabled: boolean
@@ -10,7 +21,7 @@ export interface VoiceOptions {
 
 export class VoiceNavigator {
   private observer: MutationObserver | null = null
-  private recognition: SpeechRecognition | null = null
+  private recognition: MinimalSpeechRecognition | null = null
   private hoveringElement: HTMLElement | null = null
   private options: VoiceOptions
 
@@ -65,20 +76,21 @@ export class VoiceNavigator {
       return
     }
 
-    this.recognition = new SpeechRecognitionImpl()
-    this.recognition.lang = this.options.language ?? 'en-US'
-    this.recognition.continuous = true
-    this.recognition.interimResults = false
-    this.recognition.onresult = (event) => {
+    const rec = new SpeechRecognitionImpl()
+    rec.lang = this.options.language ?? 'en-US'
+    rec.continuous = true
+    rec.interimResults = false
+    rec.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim()
       this.handleCommand(transcript.toLowerCase())
     }
-    this.recognition.onerror = (event) => {
+    rec.onerror = (event: any) => {
       console.warn('Voice recognition error', event.error)
     }
+    this.recognition = rec
 
     try {
-      this.recognition.start()
+      rec.start()
     } catch (error) {
       console.warn('Unable to start voice recognition', error)
     }
