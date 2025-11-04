@@ -165,6 +165,56 @@ function injectHighContrastStyles (): void {
       text-shadow: none !important;
       outline-color: #ffffff !important;
     }
+
+    /* Overlays, modals, backdrops, menus, popups – must cover content beneath */
+    dialog::backdrop,
+    :modal::backdrop,
+    [role="dialog"],
+    [aria-modal="true"],
+    [role="menu"],
+    [role="listbox"],
+    [role="tooltip"],
+    [class*="modal"],
+    [class*="dialog"],
+    [class*="overlay"],
+    [class*="backdrop"],
+    [class*="scrim"],
+    [class*="popup"],
+    [class*="popover"],
+    [class*="dropdown"],
+    [class*="menu"],
+    [style*="position:fixed"],
+    [style*="position: fixed"],
+    [data-genaccess-overlay] {
+      background-color: #000000 !important;
+      background-image: none !important;
+    }
+
+    /* Navigation bars / toolbars / headers should be solid, not see-through */
+    nav,
+    header,
+    footer,
+    [role="navigation"],
+    [role="menubar"],
+    [role="toolbar"],
+    [class*="nav"],
+    [class*="navbar"],
+    [class*="toolbar"],
+    [class*="header"],
+    [class*="appbar"],
+    [class*="topbar"],
+    [class*="tabbar"],
+    [class*="breadcrumbs"] {
+      background-color: #000000 !important;
+      background-image: none !important;
+      opacity: 1 !important;
+      backdrop-filter: none !important;
+      filter: none !important;
+      box-shadow: none !important;
+      border: none !important;
+      background: #000000 !important;
+      isolation: isolate !important;
+    }
     
     a, a:link, a:visited {
       color: #00ffff !important;
